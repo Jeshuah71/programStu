@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #000000;
+  background-color: #f4f4f4;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f4f4f4;
+  scroll-behavior: smooth;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.glass-panel {
+  @apply rounded-[24px] border bg-white shadow-card;
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.field {
+  @apply w-full rounded-2xl border bg-white px-4 py-3 text-sm text-suu-black outline-none transition duration-200 hover:border-suu-red/35 focus:border-suu-red focus:ring-4;
+  border-color: rgba(0, 0, 0, 0.1);
+  --tw-ring-color: rgba(219, 0, 0, 0.1);
+}
+
+.label {
+  @apply mb-2 block text-sm font-semibold text-suu-black;
+}
+
+.section-kicker {
+  @apply text-xs font-semibold uppercase tracking-[0.22em] text-suu-red;
+}
+
+.btn-primary {
+  @apply inline-flex items-center gap-2 rounded-2xl bg-suu-red px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-suu-redAlt hover:shadow-md;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center gap-2 rounded-2xl bg-suu-black px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-suu-darkGray hover:shadow-md;
+}
+
+.btn-tertiary {
+  @apply inline-flex items-center gap-2 rounded-2xl border bg-white px-4 py-2.5 text-sm font-semibold text-suu-black transition duration-200 hover:-translate-y-0.5 hover:text-suu-red hover:shadow-sm;
+  border-color: rgba(0, 0, 0, 0.1);
+}
