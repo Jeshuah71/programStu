@@ -19,12 +19,15 @@ import BlockerCenter from "./BlockerCenter";
 import StarterIssuesPanel from "./StarterIssuesPanel";
 import ManagerStudentTable from "./ManagerStudentTable";
 import ManagerGraphicsPanel from "./ManagerGraphicsPanel";
+import GitHubProgressPanel from "./GitHubProgressPanel";
 import SectionNav from "./SectionNav";
 import SectionAnchor from "./SectionAnchor";
 
 function ManagerDashboard({
   students,
   starterIssues,
+  githubIssues,
+  githubPullRequests,
   onUpdateTask,
   onCreateStudent,
   onDeleteStudent,
@@ -48,13 +51,32 @@ function ManagerDashboard({
       : 0;
     const completed = students.filter((student) => getProgressPercent(student.tasks) === 100).length;
     const activeBlockers = students.reduce((sum, student) => sum + getBlockedCount(student.tasks), 0);
+    const openPullRequests = githubPullRequests.filter((pullRequest) => pullRequest.status === "Open");
+    const waitingReview = openPullRequests.filter((pullRequest) =>
+      ["Waiting for review", "Approved"].includes(pullRequest.reviewState)
+    ).length;
+    const needsAttention = openPullRequests.filter(
+      (pullRequest) =>
+        pullRequest.reviewState === "Changes requested" || pullRequest.checksState === "Failing"
+    ).length;
+    const merged = githubPullRequests.filter((pullRequest) => pullRequest.status === "Merged").length;
     const atRisk = students.filter((student) => {
       const progress = getProgressPercent(student.tasks);
       return progress < 30 || getBlockedCount(student.tasks) > 0;
     }).length;
 
-    return { total, averageProgress, completed, activeBlockers, atRisk };
-  }, [students]);
+    return {
+      total,
+      averageProgress,
+      completed,
+      activeBlockers,
+      atRisk,
+      openPullRequests: openPullRequests.length,
+      waitingReview,
+      needsAttention,
+      merged
+    };
+  }, [students, githubPullRequests]);
 
   const filteredStudents = useMemo(() => {
     let list = [...students];
@@ -174,9 +196,10 @@ function ManagerDashboard({
 
   const navItems = [
     { id: "manager-summary", label: "Weekly Report" },
+    { id: "manager-github", label: "GitHub Progress", badge: stats.openPullRequests },
     { id: "manager-graphics", label: "Graphics", badge: 4 },
     { id: "manager-blockers", label: "Blockers", badge: stats.activeBlockers },
-    { id: "manager-issues", label: "Starter Issues", badge: starterIssues.length },
+    { id: "manager-issues", label: "Starter Issues", badge: githubIssues.length },
     { id: "manager-operations", label: "Operations", badge: filteredStudents.length }
   ];
 
@@ -188,29 +211,29 @@ function ManagerDashboard({
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="section-kicker">Supervisor Quick Actions</p>
-            <h2 className="mt-2 text-2xl font-semibold text-suu-black">Navigate the manager dashboard faster</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-suu-black">See GitHub progress without digging through Slack</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-suu-darkGray">
-              Jump directly to blockers, reporting, graphics, or student operations. Use these shortcuts when presenting to a supervisor or triaging onboarding issues quickly.
+              Jump to review queues, blockers, reporting, or student operations. Use this dashboard to see who moved work forward and who needs help.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <QuickJumpCard
-              title="Blockers"
-              value={stats.activeBlockers}
-              caption="Tasks needing follow-up"
-              onClick={() => document.getElementById("manager-blockers")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              title="Open PRs"
+              value={stats.openPullRequests}
+              caption="Student pull requests"
+              onClick={() => document.getElementById("manager-github")?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             <QuickJumpCard
-              title="Students At Risk"
-              value={stats.atRisk}
-              caption="Need supervisor attention"
-              onClick={() => document.getElementById("manager-operations")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              title="Waiting Review"
+              value={stats.waitingReview}
+              caption="Ready for reviewer action"
+              onClick={() => document.getElementById("manager-github")?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             <QuickJumpCard
-              title="Starter Issues"
-              value={starterIssues.length}
-              caption="Open and assigned work"
-              onClick={() => document.getElementById("manager-issues")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              title="Needs Attention"
+              value={stats.needsAttention}
+              caption="Review or check failures"
+              onClick={() => document.getElementById("manager-github")?.scrollIntoView({ behavior: "smooth", block: "start" })}
             />
             <QuickJumpCard
               title="Weekly Report"
@@ -231,30 +254,30 @@ function ManagerDashboard({
           tone="sky"
         />
         <StatCard
-          title="Average Progress"
-          value={`${stats.averageProgress}%`}
-          caption="Across all onboarding tasks"
+          title="Open PRs"
+          value={stats.openPullRequests}
+          caption="Student work in review"
           icon={CircleCheckBig}
           tone="emerald"
         />
         <StatCard
-          title="Students Completed"
-          value={stats.completed}
-          caption="Reached 100% completion"
+          title="Waiting Review"
+          value={stats.waitingReview}
+          caption="PRs ready for reviewer action"
           icon={CircleCheckBig}
           tone="emerald"
         />
         <StatCard
-          title="Active Blockers"
-          value={stats.activeBlockers}
-          caption="Tasks marked blocked"
+          title="Needs Attention"
+          value={stats.needsAttention}
+          caption="Changes requested or checks failing"
           icon={AlertOctagon}
           tone="amber"
         />
         <StatCard
-          title="Students At Risk"
-          value={stats.atRisk}
-          caption="Below 30% or blocked"
+          title="Merged Work"
+          value={stats.merged}
+          caption="Completed GitHub work"
           icon={ShieldAlert}
           tone="rose"
         />
@@ -265,6 +288,14 @@ function ManagerDashboard({
           summary={summary}
           loading={summaryLoading}
           onGenerate={handleGenerateSummary}
+        />
+      </SectionAnchor>
+
+      <SectionAnchor id="manager-github">
+        <GitHubProgressPanel
+          students={students}
+          githubIssues={githubIssues}
+          githubPullRequests={githubPullRequests}
         />
       </SectionAnchor>
 

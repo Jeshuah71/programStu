@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import { createNewStudent, mockStarterIssues, mockStudents } from "./mockData";
+import {
+  createNewStudent,
+  mockGitHubIssues,
+  mockGitHubPullRequests,
+  mockStarterIssues,
+  mockStudents
+} from "./mockData";
 import Layout from "./components/Layout";
 import StudentView from "./components/StudentView";
 import ManagerDashboard from "./components/ManagerDashboard";
@@ -8,6 +14,8 @@ import ManagerDashboard from "./components/ManagerDashboard";
 function App() {
   const [students, setStudents] = useState([]);
   const [starterIssues, setStarterIssues] = useState(mockStarterIssues);
+  const [githubIssues, setGitHubIssues] = useState(mockGitHubIssues);
+  const [githubPullRequests, setGitHubPullRequests] = useState(mockGitHubPullRequests);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [activeView, setActiveView] = useState("student");
   const [loading, setLoading] = useState(true);
@@ -99,8 +107,22 @@ function App() {
     }
   }
 
+  async function loadGitHubProgress() {
+    try {
+      const data = await api.getGitHubProgress();
+      setGitHubIssues(Array.isArray(data.issues) ? data.issues : mockGitHubIssues);
+      setGitHubPullRequests(
+        Array.isArray(data.pullRequests) ? data.pullRequests : mockGitHubPullRequests
+      );
+    } catch (_error) {
+      setGitHubIssues(mockGitHubIssues);
+      setGitHubPullRequests(mockGitHubPullRequests);
+    }
+  }
+
   useEffect(() => {
     loadStudents();
+    loadGitHubProgress();
   }, []);
 
   const selectedStudent = useMemo(
@@ -188,6 +210,8 @@ function App() {
         <StudentView
           students={students}
           starterIssues={starterIssues}
+          githubIssues={githubIssues}
+          githubPullRequests={githubPullRequests}
           selectedStudent={selectedStudent}
           selectedStudentId={selectedStudentId}
           onSelectStudent={setSelectedStudentId}
@@ -200,6 +224,8 @@ function App() {
         <ManagerDashboard
           students={students}
           starterIssues={starterIssues}
+          githubIssues={githubIssues}
+          githubPullRequests={githubPullRequests}
           loading={loading}
           onRefresh={loadStudents}
           onUpdateTask={handleUpdateTask}

@@ -6,9 +6,94 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 5000;
 const dataFile = path.join(__dirname, "data", "students.json");
+const githubApiBaseUrl = "https://api.github.com";
 
 app.use(cors());
 app.use(express.json());
+
+function getGitHubConfig() {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+
+  if (!token || !owner || !repo) {
+    return null;
+  }
+
+  return { token, owner, repo };
+}
+
+async function fetchGitHub(pathname) {
+  const config = getGitHubConfig();
+
+  if (!config) {
+    const error = new Error("GitHub integration is not configured");
+    error.status = 503;
+    throw error;
+  }
+
+  const response = await fetch(`${githubApiBaseUrl}${pathname}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${config.token}`,
+      "User-Agent": "suu-student-onboarding-hub",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(payload.message || "GitHub request failed");
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.json();
+}
+
+function normalizeGitHubIssue(issue) {
+  return {
+    id: `github-issue-${issue.id}`,
+    number: issue.number,
+    title: issue.title,
+    status: issue.state === "open" ? "Open" : "Closed",
+    assigneeStudentId: null,
+    assigneeLogin: issue.assignee?.login || "",
+    labels: issue.labels.map((label) => label.name),
+    repository: issue.repository_url.split("/repos/")[1] || "",
+    updatedAt: issue.updated_at,
+    url: issue.html_url
+  };
+}
+
+function getPullRequestReviewState(pullRequest) {
+  if (pullRequest.draft) {
+    return "Draft";
+  }
+
+  if (pullRequest.merged_at) {
+    return "Approved";
+  }
+
+  return "Waiting for review";
+}
+
+function normalizeGitHubPullRequest(pullRequest) {
+  return {
+    id: `github-pr-${pullRequest.id}`,
+    number: pullRequest.number,
+    title: pullRequest.title,
+    status: pullRequest.merged_at ? "Merged" : pullRequest.state === "open" ? "Open" : "Closed",
+    authorStudentId: null,
+    authorLogin: pullRequest.user?.login || "",
+    repository: pullRequest.base?.repo?.full_name || "",
+    reviewState: getPullRequestReviewState(pullRequest),
+    checksState: "Unknown",
+    linkedIssueNumber: null,
+    updatedAt: pullRequest.updated_at,
+    url: pullRequest.html_url
+  };
+}
 
 const defaultTaskBlueprints = [
   {
@@ -761,6 +846,64 @@ app.delete("/api/students/:id", async (req, res) => {
   res.status(204).send();
 });
 
+app.get("/api/github/issues", async (_req, res, next) => {
+  try {
+    const config = getGitHubConfig();
+    if (!config) {
+      return res.status(503).json({ message: "GitHub integration is not configured" });
+    }
+
+    const issues = await fetchGitHub(
+      `/repos/${config.owner}/${config.repo}/issues?state=all&per_page=50`
+    );
+    const normalizedIssues = issues
+      .filter((issue) => !issue.pull_request)
+      .map(normalizeGitHubIssue);
+
+    res.json(normalizedIssues);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/github/pulls", async (_req, res, next) => {
+  try {
+    const config = getGitHubConfig();
+    if (!config) {
+      return res.status(503).json({ message: "GitHub integration is not configured" });
+    }
+
+    const pullRequests = await fetchGitHub(
+      `/repos/${config.owner}/${config.repo}/pulls?state=all&per_page=50`
+    );
+
+    res.json(pullRequests.map(normalizeGitHubPullRequest));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/github/progress", async (_req, res, next) => {
+  try {
+    const config = getGitHubConfig();
+    if (!config) {
+      return res.status(503).json({ message: "GitHub integration is not configured" });
+    }
+
+    const [issues, pullRequests] = await Promise.all([
+      fetchGitHub(`/repos/${config.owner}/${config.repo}/issues?state=all&per_page=50`),
+      fetchGitHub(`/repos/${config.owner}/${config.repo}/pulls?state=all&per_page=50`)
+    ]);
+
+    res.json({
+      issues: issues.filter((issue) => !issue.pull_request).map(normalizeGitHubIssue),
+      pullRequests: pullRequests.map(normalizeGitHubPullRequest)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/ai/blocker-help", (req, res) => {
   res.json(buildBlockerResponse(req.body));
 });
@@ -771,7 +914,7 @@ app.post("/api/ai/manager-summary", (req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(500).json({ message: "Internal server error" });
+  res.status(err.status || 500).json({ message: err.message || "Internal server error" });
 });
 
 app.listen(PORT, () => {

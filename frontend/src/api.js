@@ -60,6 +60,9 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload)
     }),
+  getGitHubIssues: () => request("/github/issues"),
+  getGitHubPullRequests: () => request("/github/pulls"),
+  getGitHubProgress: () => request("/github/progress"),
   getBlockerHelp: (payload) =>
     request("/ai/blocker-help", {
       method: "POST",

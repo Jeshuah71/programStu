@@ -17,12 +17,15 @@ import StudentProfileCard from "./StudentProfileCard";
 import PhaseTimeline from "./PhaseTimeline";
 import DocumentationHub from "./DocumentationHub";
 import StarterIssuesPanel from "./StarterIssuesPanel";
+import GitHubProgressPanel from "./GitHubProgressPanel";
 import SectionNav from "./SectionNav";
 import SectionAnchor from "./SectionAnchor";
 
 function StudentView({
   students,
   starterIssues,
+  githubIssues,
+  githubPullRequests,
   selectedStudent,
   selectedStudentId,
   onSelectStudent,
@@ -56,6 +59,7 @@ function StudentView({
     { id: "student-selector", label: "Student" },
     { id: "student-profile", label: "Profile" },
     { id: "student-focus", label: "Today" },
+    { id: "student-github", label: "GitHub" },
     { id: "student-roadmap", label: "Roadmap" },
     { id: "student-resources", label: "Resources" },
     { id: "student-reflection", label: "Reflection" },
@@ -151,6 +155,15 @@ function StudentView({
                 blockers={blockers}
                 progress={progress}
                 onOpenAssistant={handleOpenAssistant}
+              />
+            </SectionAnchor>
+            <SectionAnchor id="student-github">
+              <GitHubProgressPanel
+                students={students}
+                githubIssues={githubIssues}
+                githubPullRequests={githubPullRequests}
+                selectedStudent={selectedStudent}
+                compact
               />
             </SectionAnchor>
             <SectionAnchor id="student-roadmap">

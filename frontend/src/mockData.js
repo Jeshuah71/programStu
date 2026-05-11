@@ -586,6 +586,154 @@ export const mockStarterIssues = [
   }
 ];
 
+export const mockGitHubIssues = [
+  {
+    id: "gh-issue-101",
+    number: 101,
+    title: "Update README setup instructions",
+    status: "In progress",
+    assigneeStudentId: "stu-003",
+    labels: ["good first issue", "docs"],
+    repository: "suu-it/student-portal",
+    updatedAt: "2026-05-10T15:20:00-06:00",
+    url: "https://github.com/suu-it/student-portal/issues/101"
+  },
+  {
+    id: "gh-issue-102",
+    number: 102,
+    title: "Fix small UI spacing issue in profile header",
+    status: "PR opened",
+    assigneeStudentId: "stu-004",
+    labels: ["frontend", "css"],
+    repository: "suu-it/student-portal",
+    updatedAt: "2026-05-09T11:45:00-06:00",
+    url: "https://github.com/suu-it/student-portal/issues/102"
+  },
+  {
+    id: "gh-issue-103",
+    number: 103,
+    title: "Improve form validation message copy",
+    status: "Changes requested",
+    assigneeStudentId: "stu-005",
+    labels: ["react", "ux"],
+    repository: "suu-it/service-desk",
+    updatedAt: "2026-05-08T09:10:00-06:00",
+    url: "https://github.com/suu-it/service-desk/issues/103"
+  },
+  {
+    id: "gh-issue-104",
+    number: 104,
+    title: "Resolve dependency install error on onboarding app",
+    status: "Blocked",
+    assigneeStudentId: "stu-006",
+    labels: ["setup", "blocked"],
+    repository: "suu-it/onboarding-hub",
+    updatedAt: "2026-05-06T14:30:00-06:00",
+    url: "https://github.com/suu-it/onboarding-hub/issues/104"
+  },
+  {
+    id: "gh-issue-105",
+    number: 105,
+    title: "Add one small API test for health endpoint",
+    status: "Not started",
+    assigneeStudentId: null,
+    labels: ["testing", "api"],
+    repository: "suu-it/student-portal",
+    updatedAt: "2026-05-07T08:00:00-06:00",
+    url: "https://github.com/suu-it/student-portal/issues/105"
+  },
+  {
+    id: "gh-issue-106",
+    number: 106,
+    title: "Add missing environment variable documentation",
+    status: "Needs review",
+    assigneeStudentId: "stu-010",
+    labels: ["docs", "environment"],
+    repository: "suu-it/onboarding-hub",
+    updatedAt: "2026-05-10T10:25:00-06:00",
+    url: "https://github.com/suu-it/onboarding-hub/issues/106"
+  },
+  {
+    id: "gh-issue-107",
+    number: 107,
+    title: "Simplify empty state copy on dashboard",
+    status: "Merged",
+    assigneeStudentId: "stu-001",
+    labels: ["ux", "frontend"],
+    repository: "suu-it/student-portal",
+    updatedAt: "2026-05-09T16:40:00-06:00",
+    url: "https://github.com/suu-it/student-portal/issues/107"
+  }
+];
+
+export const mockGitHubPullRequests = [
+  {
+    id: "gh-pr-221",
+    number: 221,
+    title: "Docs: clarify local setup steps",
+    status: "Open",
+    authorStudentId: "stu-003",
+    repository: "suu-it/student-portal",
+    reviewState: "Draft",
+    checksState: "Pending",
+    linkedIssueNumber: 101,
+    updatedAt: "2026-05-10T15:20:00-06:00",
+    url: "https://github.com/suu-it/student-portal/pull/221"
+  },
+  {
+    id: "gh-pr-222",
+    number: 222,
+    title: "Fix profile header spacing",
+    status: "Open",
+    authorStudentId: "stu-004",
+    repository: "suu-it/student-portal",
+    reviewState: "Waiting for review",
+    checksState: "Passing",
+    linkedIssueNumber: 102,
+    updatedAt: "2026-05-09T11:45:00-06:00",
+    url: "https://github.com/suu-it/student-portal/pull/222"
+  },
+  {
+    id: "gh-pr-223",
+    number: 223,
+    title: "Improve validation copy",
+    status: "Open",
+    authorStudentId: "stu-005",
+    repository: "suu-it/service-desk",
+    reviewState: "Changes requested",
+    checksState: "Passing",
+    linkedIssueNumber: 103,
+    updatedAt: "2026-05-08T09:10:00-06:00",
+    url: "https://github.com/suu-it/service-desk/pull/223"
+  },
+  {
+    id: "gh-pr-224",
+    number: 224,
+    title: "Document environment variable requirements",
+    status: "Open",
+    authorStudentId: "stu-010",
+    repository: "suu-it/onboarding-hub",
+    reviewState: "Approved",
+    checksState: "Failing",
+    linkedIssueNumber: 106,
+    updatedAt: "2026-05-10T10:25:00-06:00",
+    url: "https://github.com/suu-it/onboarding-hub/pull/224"
+  },
+  {
+    id: "gh-pr-225",
+    number: 225,
+    title: "Simplify dashboard empty state",
+    status: "Merged",
+    authorStudentId: "stu-001",
+    repository: "suu-it/student-portal",
+    reviewState: "Approved",
+    checksState: "Passing",
+    linkedIssueNumber: 107,
+    updatedAt: "2026-05-09T16:40:00-06:00",
+    url: "https://github.com/suu-it/student-portal/pull/225"
+  }
+];
+
 export { documentationResources, taskBlueprints };
 
 export function createNewStudent(payload, nextNumber) {

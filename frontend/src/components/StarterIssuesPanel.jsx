@@ -17,8 +17,8 @@ function StarterIssuesPanel({ starterIssues, students, selectedStudent, compact 
             <Sparkles size={18} />
           </div>
           <div>
-            <p className="section-kicker">Starter Issues</p>
-            <h3 className="mt-1 text-xl font-semibold text-suu-black">Recommended next starter issue</h3>
+            <p className="section-kicker">Starter GitHub Issues</p>
+            <h3 className="mt-1 text-xl font-semibold text-suu-black">Recommended next GitHub issue</h3>
           </div>
         </div>
 
@@ -38,7 +38,7 @@ function StarterIssuesPanel({ starterIssues, students, selectedStudent, compact 
           </div>
         ) : (
           <div className="mt-5 rounded-[20px] border border-dashed border-suu-black/10 bg-white p-4 text-sm text-suu-darkGray">
-            Keep moving through the onboarding roadmap. Starter issue recommendations unlock once the student is closer to independent contribution.
+            Keep moving through the onboarding roadmap. GitHub issue recommendations unlock once the student is closer to independent contribution.
           </div>
         )}
       </section>
@@ -53,8 +53,8 @@ function StarterIssuesPanel({ starterIssues, students, selectedStudent, compact 
     <section className="glass-panel p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="section-kicker">Starter Issues</p>
-          <h3 className="mt-2 text-2xl font-semibold text-suu-black">Manager starter issue overview</h3>
+          <p className="section-kicker">Starter GitHub Issues</p>
+          <h3 className="mt-2 text-2xl font-semibold text-suu-black">Manager GitHub issue overview</h3>
         </div>
         <div className="flex gap-3 text-sm">
           <span className="rounded-full bg-suu-gray px-3 py-1 font-semibold text-suu-black">Open {openCount}</span>

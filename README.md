@@ -67,6 +67,43 @@ Default ports:
 - Backend: `http://localhost:5000`
 - Frontend: `http://localhost:5173`
 
+## Test With Real GitHub Data
+
+The GitHub progress radar can read issues and pull requests from one real GitHub repository. For local testing, create a fine-grained personal access token in GitHub with read-only access to the repo.
+
+Required token permissions:
+
+- Metadata: read
+- Issues: read
+- Pull requests: read
+
+Start the backend with your GitHub settings:
+
+```bash
+GITHUB_TOKEN=your_token_here \
+GITHUB_OWNER=your-github-username-or-org \
+GITHUB_REPO=your-repo-name \
+npm run dev --prefix backend
+```
+
+Then start the frontend:
+
+```bash
+npm run dev --prefix frontend
+```
+
+The frontend calls `/api/github/progress` through the backend. If the GitHub token, owner, repo, or backend is unavailable, the app falls back to the polished mock GitHub data so the demo still works.
+
+Direct backend checks:
+
+```bash
+curl http://localhost:5000/api/github/issues
+curl http://localhost:5000/api/github/pulls
+curl http://localhost:5000/api/github/progress
+```
+
+Never put `GITHUB_TOKEN` in frontend code or commit it to Git.
+
 ## Run Backend Only
 
 ```bash
