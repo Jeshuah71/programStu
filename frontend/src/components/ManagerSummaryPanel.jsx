@@ -6,26 +6,38 @@ function ManagerSummaryPanel({ summary, loading, onGenerate }) {
       return;
     }
 
-    const report = [
-      "SUU Student Programmer Weekly Report",
-      "",
-      `Team Snapshot: ${summary.teamSnapshot}`,
-      "",
-      "Students Needing Attention:",
-      ...summary.studentsNeedingAttention.map((item) => `- ${item}`),
-      "",
-      "Common Blockers:",
-      ...summary.commonBlockers.map((item) => `- ${item}`),
-      "",
-      "Suggested Manager Actions:",
-      ...summary.suggestedManagerActions.map((item) => `- ${item}`),
-      "",
-      "Wins This Week:",
-      ...summary.winsThisWeek.map((item) => `- ${item}`),
-      "",
-      "Next Week Focus:",
-      ...summary.nextWeekFocus.map((item) => `- ${item}`)
-    ].join("\n");
+    const report = summary.weekRange
+      ? [
+          `## This Week: ${summary.weekRange}`,
+          `**Wins:**`,
+          ...summary.winsThisWeek.map((item) => `- ${item}`),
+          `**At Risk:**`,
+          ...summary.atRisk.map((item) => `- ${item}`),
+          `**Blockers to Resolve:**`,
+          ...summary.blockersToResolve.map((item) => `- ${item}`),
+          `**Recommended Actions:**`,
+          ...summary.recommendedActions.map((item) => `- ${item}`)
+        ].join("\n")
+      : [
+          "SUU Student Programmer Weekly Report",
+          "",
+          `Team Snapshot: ${summary.teamSnapshot}`,
+          "",
+          "Students Needing Attention:",
+          ...summary.studentsNeedingAttention.map((item) => `- ${item}`),
+          "",
+          "Common Blockers:",
+          ...summary.commonBlockers.map((item) => `- ${item}`),
+          "",
+          "Suggested Manager Actions:",
+          ...summary.suggestedManagerActions.map((item) => `- ${item}`),
+          "",
+          "Wins This Week:",
+          ...summary.winsThisWeek.map((item) => `- ${item}`),
+          "",
+          "Next Week Focus:",
+          ...summary.nextWeekFocus.map((item) => `- ${item}`)
+        ].join("\n");
 
     await navigator.clipboard.writeText(report);
   }
@@ -57,7 +69,20 @@ function ManagerSummaryPanel({ summary, loading, onGenerate }) {
         </div>
       </div>
 
-      {summary ? (
+      {summary?.weekRange ? (
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <section className="rounded-lg border border-slate-200 bg-white p-5 lg:col-span-2">
+            <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-suu-darkGray">
+              This Week: {summary.weekRange}
+            </h4>
+            <p className="mt-3 text-sm leading-7 text-suu-black">{summary.teamSnapshot}</p>
+          </section>
+          <SummaryList title="Wins" items={summary.winsThisWeek} tone="emerald" />
+          <SummaryList title="At Risk" items={summary.atRisk} tone="rose" />
+          <SummaryList title="Blockers to Resolve" items={summary.blockersToResolve} tone="rose" />
+          <SummaryList title="Recommended Actions" items={summary.recommendedActions} tone="sky" />
+        </div>
+      ) : summary ? (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <section className="rounded-3xl border border-slate-200 bg-white p-5 lg:col-span-2">
             <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-suu-darkGray">

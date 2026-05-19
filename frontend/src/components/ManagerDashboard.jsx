@@ -8,7 +8,7 @@ import {
   UserPlus
 } from "lucide-react";
 import { api } from "../api";
-import { getMockManagerSummary } from "../mockAi";
+import { getMockKanbanManagerSummary, getMockManagerSummary } from "../mockAi";
 import { getBlockedCount, getProgressPercent } from "../utils/progress";
 import StatCard from "./StatCard";
 import ManagerSummaryPanel from "./ManagerSummaryPanel";
@@ -22,15 +22,21 @@ import ManagerGraphicsPanel from "./ManagerGraphicsPanel";
 import GitHubProgressPanel from "./GitHubProgressPanel";
 import SectionNav from "./SectionNav";
 import SectionAnchor from "./SectionAnchor";
+import KanbanBoard from "./kanban/KanbanBoard";
+import EpicsView from "./kanban/EpicsView";
 
 function ManagerDashboard({
   students,
   starterIssues,
   githubIssues,
   githubPullRequests,
+  epics,
+  stories,
   onUpdateTask,
   onCreateStudent,
   onDeleteStudent,
+  onMoveStory,
+  onCreateStory,
   demoMode
 }) {
   const [filter, setFilter] = useState("all");
@@ -130,15 +136,15 @@ function ManagerDashboard({
       let data;
       if (!demoMode) {
         try {
-          data = await api.generateManagerSummary({ students });
+          data = await api.generateKanbanManagerSummary({ students, stories, epics, githubPullRequests });
           if (!data?.teamSnapshot) {
-            data = getMockManagerSummary(students);
+            data = getMockKanbanManagerSummary({ students, stories, epics });
           }
         } catch (_error) {
-          data = getMockManagerSummary(students);
+          data = getMockKanbanManagerSummary({ students, stories, epics });
         }
       } else {
-        data = getMockManagerSummary(students);
+        data = getMockKanbanManagerSummary({ students, stories, epics }) || getMockManagerSummary(students);
       }
       setSummary(data);
     } finally {
@@ -196,6 +202,8 @@ function ManagerDashboard({
 
   const navItems = [
     { id: "manager-summary", label: "Weekly Report" },
+    { id: "manager-kanban", label: "Kanban", badge: stories.length },
+    { id: "manager-epics", label: "Epics", badge: epics.length },
     { id: "manager-github", label: "GitHub Progress", badge: stats.openPullRequests },
     { id: "manager-graphics", label: "Graphics", badge: 4 },
     { id: "manager-blockers", label: "Blockers", badge: stats.activeBlockers },
@@ -288,6 +296,27 @@ function ManagerDashboard({
           summary={summary}
           loading={summaryLoading}
           onGenerate={handleGenerateSummary}
+        />
+      </SectionAnchor>
+
+      <SectionAnchor id="manager-kanban">
+        <KanbanBoard
+          mode="manager"
+          students={students}
+          stories={stories}
+          epics={epics}
+          onMoveStory={onMoveStory}
+          onCreateStory={onCreateStory}
+        />
+      </SectionAnchor>
+
+      <SectionAnchor id="manager-epics">
+        <EpicsView
+          mode="manager"
+          students={students}
+          epics={epics}
+          stories={stories}
+          onCreateStory={onCreateStory}
         />
       </SectionAnchor>
 

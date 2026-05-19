@@ -176,3 +176,70 @@ export function getMockManagerSummary(students) {
     ]
   };
 }
+
+export function getMockWorkGuide({ student, stories, epics, blockers }) {
+  const readyStory = stories.find((story) => story.status === "ready");
+  const staleLargeStory = stories.find(
+    (story) => story.status === "in-progress" && Number(story.estimateDays) > 5
+  );
+  const currentEpic = readyStory
+    ? epics.find((epic) => epic.id === readyStory.epicId)
+    : epics.find((epic) => stories.some((story) => story.epicId === epic.id));
+  const blocker = blockers?.[0];
+
+  if (!readyStory) {
+    return {
+      message: `${student.name}, do not pull new work yet. Clear your active story or ask your mentor to refine the next story before starting anything else. ${blocker ? `Escalate "${blocker.title}" today so your mentor can remove the blocker.` : "You do not have a blocker that needs escalation right now."}`
+    };
+  }
+
+  return {
+    message: `${student.name}, pick up "${readyStory.title}" next because it is ready and directly supports ${currentEpic?.title || "your current epic"}. ${staleLargeStory ? `Your in-progress story "${staleLargeStory.title}" has grown past five days, so ask your mentor to split it before adding more scope.` : "None of your in-progress stories need splitting right now."} ${blocker ? `Escalate "${blocker.title}" today with the exact blocker details.` : "No blocker needs escalation today."}`
+  };
+}
+
+export function getMockKanbanManagerSummary({ students, stories, epics }) {
+  const blocked = stories.filter((story) => story.status === "blocked");
+  const staleReview = stories.filter((story) => story.status === "in-review");
+  const done = stories.filter((story) => story.status === "done").slice(0, 3);
+  const atRiskEpics = epics.filter((epic) =>
+    stories.some((story) => story.epicId === epic.id && ["blocked", "in-review"].includes(story.status))
+  );
+  const quietStudents = students.filter(
+    (student) => !stories.some((story) => story.assigneeStudentId === student.id && story.status !== "backlog")
+  );
+
+  return {
+    weekRange: "May 12-18, 2026",
+    winsThisWeek: done.length
+      ? done.map((story) => `${story.title} shipped as a ${story.artifact}.`)
+      : ["No stories were marked done this week."],
+    atRisk: [
+      ...atRiskEpics.slice(0, 3).map((epic) => `${epic.title} needs attention because work is blocked or waiting in review.`),
+      ...quietStudents.slice(0, 2).map((student) => `${student.name} has no visible Kanban movement this week.`)
+    ],
+    blockersToResolve: blocked.length
+      ? blocked.map((story) => {
+          const student = students.find((item) => item.id === story.assigneeStudentId);
+          return `${student?.name || "Unassigned"} - ${story.title}: ${story.blockedReason || "blocker details needed"}`;
+        })
+      : ["No blocked stories are currently on the board."],
+    recommendedActions: [
+      "Review blocked stories first and assign one manager-owned unblock action.",
+      "Clear the stale review queue before asking students to pull more work.",
+      "Ask each student with no movement to choose a ready story or update their blocker note."
+    ],
+    teamSnapshot: `Kanban view shows ${stories.length} active stories across ${epics.length} epics, with ${blocked.length} blocked and ${staleReview.length} in review.`,
+    studentsNeedingAttention: blocked.map((story) => {
+      const student = students.find((item) => item.id === story.assigneeStudentId);
+      return `${student?.name || "Unassigned"} - ${story.title}`;
+    }),
+    commonBlockers: blocked.map((story) => story.blockedReason || story.title),
+    suggestedManagerActions: [
+      "Resolve blocked work before adding new assignments.",
+      "Follow up on in-review stories older than three days.",
+      "Split any story estimated above five days."
+    ],
+    nextWeekFocus: ["Keep WIP under limit and pull from Refined / Ready.", "Use epics to keep stories tied to visible artifacts."]
+  };
+}

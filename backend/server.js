@@ -7,6 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const dataFile = path.join(__dirname, "data", "students.json");
 const githubApiBaseUrl = "https://api.github.com";
+const anthropicApiBaseUrl = "https://api.anthropic.com/v1/messages";
 
 app.use(cors());
 app.use(express.json());
@@ -49,6 +50,40 @@ async function fetchGitHub(pathname) {
   }
 
   return response.json();
+}
+
+async function askClaude(prompt) {
+  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    const error = new Error("Anthropic integration is not configured");
+    error.status = 503;
+    throw error;
+  }
+
+  const response = await fetch(anthropicApiBaseUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-3-5-sonnet-latest",
+      max_tokens: 700,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(payload.error?.message || "Anthropic request failed");
+    error.status = response.status;
+    throw error;
+  }
+
+  const payload = await response.json();
+  return payload.content?.map((item) => item.text).join("\n").trim() || "";
 }
 
 function normalizeGitHubIssue(issue) {
@@ -908,8 +943,63 @@ app.post("/api/ai/blocker-help", (req, res) => {
   res.json(buildBlockerResponse(req.body));
 });
 
-app.post("/api/ai/manager-summary", (req, res) => {
-  res.json(buildManagerSummary(req.body.students || []));
+app.post("/api/ai/work-guide", async (req, res, next) => {
+  try {
+    const { boardJSON, phase, blockers, prs } = req.body || {};
+    const prompt = `You are a senior developer mentor for a university IT team using Kanban.
+The student's current board state is: ${JSON.stringify(boardJSON)}
+Their onboarding phase is: ${phase}
+Their open blockers are: ${JSON.stringify(blockers)}
+Their recent PRs: ${JSON.stringify(prs)}
+
+Respond with a short, direct answer (3-5 sentences max) covering:
+1. The one story they should pick up next and why
+2. Whether any story needs splitting (>5 days in column)
+3. Any blocker they need to escalate today
+Speak directly to the student. Be specific, not generic.`;
+
+    const message = await askClaude(prompt);
+    res.json({ message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/manager-summary", async (req, res, next) => {
+  const { students = [], stories = [], epics = [], githubPullRequests = [] } = req.body || {};
+
+  if (!stories.length || !epics.length) {
+    return res.json(buildManagerSummary(students));
+  }
+
+  try {
+    const prompt = `You are Claude, preparing a manager weekly report for the SUU IT student programmer team.
+Use all students' Kanban board states, epics on track versus at risk, stories stuck in Blocked or In Review for 3+ days, students with no activity this week, and recommended manager actions.
+
+Students: ${JSON.stringify(students)}
+Stories: ${JSON.stringify(stories)}
+Epics: ${JSON.stringify(epics)}
+Recent PRs: ${JSON.stringify(githubPullRequests)}
+
+Output exactly this format:
+## This Week: [Date Range]
+**Wins:** [1-3 bullet points of shipped stories/PRs]
+**At Risk:** [epics or students needing attention]
+**Blockers to Resolve:** [specific blockers with student names]
+**Recommended Actions:** [3 concrete things the manager should do Monday morning]`;
+
+    const message = await askClaude(prompt);
+    res.json({
+      weekRange: "Claude Generated",
+      teamSnapshot: message,
+      winsThisWeek: [message],
+      atRisk: [],
+      blockersToResolve: [],
+      recommendedActions: []
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use((err, _req, res, _next) => {

@@ -72,5 +72,15 @@ export const api = {
     request("/ai/manager-summary", {
       method: "POST",
       body: JSON.stringify(payload)
+    }),
+  getWorkGuide: (payload) =>
+    request("/ai/work-guide", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  generateKanbanManagerSummary: (payload) =>
+    request("/ai/manager-summary", {
+      method: "POST",
+      body: JSON.stringify(payload)
     })
 };

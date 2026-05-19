@@ -20,17 +20,28 @@ import StarterIssuesPanel from "./StarterIssuesPanel";
 import GitHubProgressPanel from "./GitHubProgressPanel";
 import SectionNav from "./SectionNav";
 import SectionAnchor from "./SectionAnchor";
+import KanbanBoard from "./kanban/KanbanBoard";
+import EpicsView from "./kanban/EpicsView";
+import WorkGuide from "./ai/WorkGuide";
+import HandbookTab from "./handbook/HandbookTab";
+import WorktreeHelper from "./handbook/WorktreeHelper";
 
 function StudentView({
   students,
   starterIssues,
   githubIssues,
   githubPullRequests,
+  epics,
+  stories,
+  worktrees,
   selectedStudent,
   selectedStudentId,
   onSelectStudent,
   onUpdateTask,
   onUpdateStudent,
+  onMoveStory,
+  onCreateStory,
+  onCreateWorktree,
   demoMode
 }) {
   const [savingTaskId, setSavingTaskId] = useState("");
@@ -59,8 +70,12 @@ function StudentView({
     { id: "student-selector", label: "Student" },
     { id: "student-profile", label: "Profile" },
     { id: "student-focus", label: "Today" },
+    { id: "student-kanban", label: "Kanban" },
+    { id: "student-epics", label: "Epics" },
+    { id: "student-worktrees", label: "Worktrees" },
     { id: "student-github", label: "GitHub" },
     { id: "student-roadmap", label: "Roadmap" },
+    { id: "student-handbook", label: "Handbook" },
     { id: "student-resources", label: "Resources" },
     { id: "student-reflection", label: "Reflection" },
     { id: "student-checklist", label: "Checklist" }
@@ -157,6 +172,46 @@ function StudentView({
                 onOpenAssistant={handleOpenAssistant}
               />
             </SectionAnchor>
+            <SectionAnchor id="student-kanban">
+              <div className="space-y-6">
+                <WorkGuide
+                  student={selectedStudent}
+                  stories={stories}
+                  epics={epics}
+                  blockers={selectedStudent.tasks.filter((task) => task.status === "blocked")}
+                  prs={githubPullRequests.filter((pullRequest) => pullRequest.authorStudentId === selectedStudent.id)}
+                  demoMode={demoMode}
+                />
+                <KanbanBoard
+                  mode="student"
+                  students={students}
+                  selectedStudent={selectedStudent}
+                  stories={stories}
+                  epics={epics}
+                  onMoveStory={onMoveStory}
+                  onCreateStory={onCreateStory}
+                  onCreateWorktree={onCreateWorktree}
+                />
+              </div>
+            </SectionAnchor>
+            <SectionAnchor id="student-epics">
+              <EpicsView
+                mode="student"
+                students={students}
+                selectedStudent={selectedStudent}
+                epics={epics}
+                stories={stories}
+                onCreateStory={onCreateStory}
+              />
+            </SectionAnchor>
+            <SectionAnchor id="student-worktrees">
+              <WorktreeHelper
+                student={selectedStudent}
+                stories={stories}
+                worktrees={worktrees}
+                onCopyCommand={onCreateWorktree}
+              />
+            </SectionAnchor>
             <SectionAnchor id="student-github">
               <GitHubProgressPanel
                 students={students}
@@ -168,6 +223,9 @@ function StudentView({
             </SectionAnchor>
             <SectionAnchor id="student-roadmap">
               <PhaseTimeline tasks={selectedStudent.tasks} />
+            </SectionAnchor>
+            <SectionAnchor id="student-handbook">
+              <HandbookTab student={selectedStudent} />
             </SectionAnchor>
             <div className="grid gap-6 xl:grid-cols-2">
               <StarterIssuesPanel
