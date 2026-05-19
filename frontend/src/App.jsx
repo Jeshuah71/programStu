@@ -7,6 +7,8 @@ import {
   mockStarterIssues,
   mockStudents
 } from "./mockData";
+import { mockEpics, mockStories, mockWorktrees } from "./mockWorkManagement";
+import { createStoryFromForm, slugifyStory } from "./utils/workManagement";
 import Layout from "./components/Layout";
 import StudentView from "./components/StudentView";
 import ManagerDashboard from "./components/ManagerDashboard";
@@ -16,6 +18,9 @@ function App() {
   const [starterIssues, setStarterIssues] = useState(mockStarterIssues);
   const [githubIssues, setGitHubIssues] = useState(mockGitHubIssues);
   const [githubPullRequests, setGitHubPullRequests] = useState(mockGitHubPullRequests);
+  const [epics] = useState(mockEpics);
+  const [stories, setStories] = useState(mockStories);
+  const [worktrees, setWorktrees] = useState(mockWorktrees);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [activeView, setActiveView] = useState("student");
   const [loading, setLoading] = useState(true);
@@ -197,6 +202,49 @@ function App() {
     }
   }
 
+  function handleMoveStory(storyId, status) {
+    setStories((current) =>
+      current.map((story) =>
+        story.id === storyId
+          ? {
+              ...story,
+              status,
+              movedAt: new Date().toISOString()
+            }
+          : story
+      )
+    );
+  }
+
+  function handleCreateStory(form) {
+    setStories((current) => [createStoryFromForm(form, students), ...current]);
+  }
+
+  async function handleCreateWorktree(story) {
+    const slug = slugifyStory(story.title);
+    const command = `git worktree add ../${slug} -b feat/${slug}`;
+    await navigator.clipboard.writeText(command);
+
+    setWorktrees((current) => {
+      if (current.some((worktree) => worktree.storyId === story.id)) {
+        return current;
+      }
+
+      return [
+        {
+          id: `wt-${crypto.randomUUID()}`,
+          studentId: story.assigneeStudentId,
+          storyId: story.id,
+          path: `../${slug}`,
+          branch: `feat/${slug}`,
+          status: "Command copied"
+        },
+        ...current
+      ];
+    });
+    setNotice(`Copied: ${command}`);
+  }
+
   return (
     <Layout
       activeView={activeView}
@@ -212,12 +260,18 @@ function App() {
           starterIssues={starterIssues}
           githubIssues={githubIssues}
           githubPullRequests={githubPullRequests}
+          epics={epics}
+          stories={stories}
+          worktrees={worktrees}
           selectedStudent={selectedStudent}
           selectedStudentId={selectedStudentId}
           onSelectStudent={setSelectedStudentId}
           onRefresh={loadStudents}
           onUpdateTask={handleUpdateTask}
           onUpdateStudent={handleUpdateStudent}
+          onMoveStory={handleMoveStory}
+          onCreateStory={handleCreateStory}
+          onCreateWorktree={handleCreateWorktree}
           demoMode={demoMode}
         />
       ) : (
@@ -226,6 +280,8 @@ function App() {
           starterIssues={starterIssues}
           githubIssues={githubIssues}
           githubPullRequests={githubPullRequests}
+          epics={epics}
+          stories={stories}
           loading={loading}
           onRefresh={loadStudents}
           onUpdateTask={handleUpdateTask}
@@ -233,6 +289,8 @@ function App() {
           onCreateStudent={handleCreateStudent}
           onDeleteStudent={handleDeleteStudent}
           onUpdateStarterIssues={setStarterIssues}
+          onMoveStory={handleMoveStory}
+          onCreateStory={handleCreateStory}
           demoMode={demoMode}
           onSelectStudent={(studentId) => {
             setSelectedStudentId(studentId);
