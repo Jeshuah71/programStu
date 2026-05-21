@@ -18,9 +18,10 @@ function App() {
   const [starterIssues, setStarterIssues] = useState(mockStarterIssues);
   const [githubIssues, setGitHubIssues] = useState(mockGitHubIssues);
   const [githubPullRequests, setGitHubPullRequests] = useState(mockGitHubPullRequests);
-  const [epics] = useState(mockEpics);
+  const [epics, setEpics] = useState(mockEpics);
   const [stories, setStories] = useState(mockStories);
   const [worktrees, setWorktrees] = useState(mockWorktrees);
+  const [workManagementLive, setWorkManagementLive] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [activeView, setActiveView] = useState("student");
   const [loading, setLoading] = useState(true);
@@ -125,9 +126,25 @@ function App() {
     }
   }
 
+  async function loadGitHubProject() {
+    try {
+      const data = await api.getGitHubProject();
+      if (Array.isArray(data.epics) && Array.isArray(data.stories)) {
+        setEpics(data.epics.length ? data.epics : mockEpics);
+        setStories(data.stories.length ? data.stories : mockStories);
+        setWorkManagementLive(Boolean(data.stories.length));
+      }
+    } catch (_error) {
+      setEpics(mockEpics);
+      setStories(mockStories);
+      setWorkManagementLive(false);
+    }
+  }
+
   useEffect(() => {
     loadStudents();
     loadGitHubProgress();
+    loadGitHubProject();
   }, []);
 
   const selectedStudent = useMemo(
@@ -202,7 +219,8 @@ function App() {
     }
   }
 
-  function handleMoveStory(storyId, status) {
+  async function handleMoveStory(storyId, status) {
+    const previousStories = stories;
     setStories((current) =>
       current.map((story) =>
         story.id === storyId
@@ -214,10 +232,40 @@ function App() {
           : story
       )
     );
+
+    if (!workManagementLive) {
+      return;
+    }
+
+    try {
+      await api.updateGitHubProjectStatus(storyId, status);
+    } catch (_error) {
+      setStories(previousStories);
+      setNotice("GitHub Project update failed. The card was moved back locally.");
+    }
   }
 
-  function handleCreateStory(form) {
-    setStories((current) => [createStoryFromForm(form, students), ...current]);
+  async function handleCreateStory(form) {
+    const epic = epics.find((item) => item.id === form.epicId);
+    const draft = createStoryFromForm(form, students);
+    setStories((current) => [draft, ...current]);
+
+    if (!workManagementLive) {
+      return;
+    }
+
+    try {
+      const data = await api.createGitHubProjectIssue({
+        ...form,
+        epicTitle: epic?.title || form.epicId
+      });
+      if (Array.isArray(data.epics) && Array.isArray(data.stories)) {
+        setEpics(data.epics.length ? data.epics : epics);
+        setStories(data.stories);
+      }
+    } catch (_error) {
+      setNotice("GitHub issue creation failed. The story remains visible locally for the demo.");
+    }
   }
 
   async function handleCreateWorktree(story) {

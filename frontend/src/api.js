@@ -63,6 +63,17 @@ export const api = {
   getGitHubIssues: () => request("/github/issues"),
   getGitHubPullRequests: () => request("/github/pulls"),
   getGitHubProgress: () => request("/github/progress"),
+  getGitHubProject: () => request("/github/project"),
+  updateGitHubProjectStatus: (itemId, status) =>
+    request(`/github/project/items/${encodeURIComponent(itemId)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status })
+    }),
+  createGitHubProjectIssue: (payload) =>
+    request("/github/project/issues", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
   getBlockerHelp: (payload) =>
     request("/ai/blocker-help", {
       method: "POST",

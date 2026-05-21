@@ -1,3 +1,5 @@
+require("dotenv").config({ path: pathEnvFile() });
+
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs/promises");
@@ -12,6 +14,10 @@ const anthropicApiBaseUrl = "https://api.anthropic.com/v1/messages";
 app.use(cors());
 app.use(express.json());
 
+function pathEnvFile() {
+  return require("path").join(__dirname, ".env");
+}
+
 function getGitHubConfig() {
   const token = process.env.GITHUB_TOKEN;
   const owner = process.env.GITHUB_OWNER;
@@ -22,6 +28,19 @@ function getGitHubConfig() {
   }
 
   return { token, owner, repo };
+}
+
+function getGitHubProjectConfig() {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_PROJECT_OWNER || process.env.GITHUB_ORG || process.env.GITHUB_OWNER;
+  const projectId = process.env.GITHUB_PROJECT_ID || process.env.VITE_GITHUB_PROJECT_ID;
+  const projectNumber = process.env.GITHUB_PROJECT_NUMBER || process.env.VITE_GITHUB_PROJECT_NUMBER;
+
+  if (!token || !owner || (!projectId && !projectNumber)) {
+    return null;
+  }
+
+  return { token, owner, projectId, projectNumber: projectNumber ? Number(projectNumber) : null };
 }
 
 async function fetchGitHub(pathname) {
@@ -50,6 +69,68 @@ async function fetchGitHub(pathname) {
   }
 
   return response.json();
+}
+
+async function mutateGitHub(pathname, options = {}) {
+  const config = getGitHubConfig();
+
+  if (!config) {
+    const error = new Error("GitHub integration is not configured");
+    error.status = 503;
+    throw error;
+  }
+
+  const response = await fetch(`${githubApiBaseUrl}${pathname}`, {
+    method: options.method || "POST",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${config.token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "suu-student-onboarding-hub",
+      "X-GitHub-Api-Version": "2022-11-28"
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(payload.message || "GitHub request failed");
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.json();
+}
+
+async function fetchGitHubGraphQL(query, variables = {}) {
+  const projectConfig = getGitHubProjectConfig();
+  const token = projectConfig?.token || process.env.GITHUB_TOKEN;
+
+  if (!token) {
+    const error = new Error("GitHub project integration is not configured");
+    error.status = 503;
+    throw error;
+  }
+
+  const response = await fetch(`${githubApiBaseUrl}/graphql`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "suu-student-onboarding-hub"
+    },
+    body: JSON.stringify({ query, variables })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.errors?.length) {
+    const error = new Error(payload.errors?.[0]?.message || "GitHub GraphQL request failed");
+    error.status = response.status || 500;
+    throw error;
+  }
+
+  return payload.data;
 }
 
 async function askClaude(prompt) {
@@ -128,6 +209,406 @@ function normalizeGitHubPullRequest(pullRequest) {
     updatedAt: pullRequest.updated_at,
     url: pullRequest.html_url
   };
+}
+
+const statusToProjectName = {
+  backlog: "Backlog",
+  ready: "Refined / Ready",
+  blocked: "Blocked",
+  "in-progress": "In Progress",
+  "in-review": "In Review",
+  done: "Done"
+};
+
+const projectNameToStatus = Object.entries(statusToProjectName).reduce((acc, [key, value]) => {
+  acc[value.toLowerCase()] = key;
+  return acc;
+}, {});
+
+function toStatusId(value) {
+  if (!value) {
+    return "backlog";
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return projectNameToStatus[normalized] || normalized.replace(/\s+/g, "-").replace("refined-/-ready", "ready");
+}
+
+function slugify(value) {
+  return String(value || "uncategorized")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48);
+}
+
+function getProjectFieldValue(fieldValue) {
+  if (!fieldValue?.field?.name) {
+    return null;
+  }
+
+  if (typeof fieldValue.text === "string") {
+    return fieldValue.text;
+  }
+  if (typeof fieldValue.name === "string") {
+    return fieldValue.name;
+  }
+  if (typeof fieldValue.date === "string") {
+    return fieldValue.date;
+  }
+  if (fieldValue.users?.nodes?.length) {
+    return fieldValue.users.nodes.map((user) => user.login).join(", ");
+  }
+
+  return null;
+}
+
+function buildFieldMap(item) {
+  return (item.fieldValues?.nodes || []).reduce((acc, fieldValue) => {
+    const value = getProjectFieldValue(fieldValue);
+    if (fieldValue?.field?.name && value !== null && value !== "") {
+      acc[fieldValue.field.name] = value;
+    }
+    return acc;
+  }, {});
+}
+
+function getContentAssignees(content) {
+  return content?.assignees?.nodes?.map((assignee) => assignee.login) || [];
+}
+
+function findStudentForAssignee(students, assigneeLogins) {
+  const normalizedLogins = assigneeLogins.map((login) => login.toLowerCase());
+  return students.find((student) => {
+    const candidates = [
+      student.githubUsername,
+      student.githubLogin,
+      student.username,
+      student.email?.split("@")[0],
+      student.name?.toLowerCase().replace(/\s+/g, "")
+    ]
+      .filter(Boolean)
+      .map((value) => String(value).toLowerCase());
+
+    return candidates.some((candidate) => normalizedLogins.includes(candidate));
+  });
+}
+
+function normalizeProjectItemToStory(item, students) {
+  const fields = buildFieldMap(item);
+  const content = item.content || {};
+  const assigneeLogins = fields["Assigned To"]
+    ? String(fields["Assigned To"]).split(",").map((login) => login.trim()).filter(Boolean)
+    : getContentAssignees(content);
+  const student = findStudentForAssignee(students, assigneeLogins);
+  const epicTitle = fields.Epic || "Unassigned Epic";
+  const artifact = fields.Artifact || (content.__typename === "PullRequest" ? "PR" : "Doc");
+  const storyType = fields["Story Type"] || "Story";
+  const status = toStatusId(fields["Kanban Status"] || fields.Status || content.state);
+  const movedAt = item.updatedAt || content.updatedAt || new Date().toISOString();
+
+  return {
+    id: item.id,
+    projectItemId: item.id,
+    contentId: content.id || "",
+    githubNumber: content.number || null,
+    githubType: content.__typename || "DraftIssue",
+    title: content.title || "Untitled project item",
+    epicId: `epic-${slugify(epicTitle)}`,
+    assigneeStudentId: student?.id || "",
+    assigneeLogin: assigneeLogins[0] || "",
+    artifact,
+    storyType,
+    status,
+    estimateDays: Number(fields["Estimate Days"] || fields.Estimate || 2),
+    movedAt,
+    overview: content.body || "",
+    why: "",
+    problem: "",
+    requestedBy: fields["Requested By"] || "",
+    acceptanceCriteria: [],
+    constraints: "",
+    dependencies: fields.Dependencies || "",
+    artifactLink: content.url || "",
+    verification: fields.Verification || "",
+    followUp: "",
+    blockedReason: fields.Blocker || fields["Blocked Reason"] || "",
+    repository: content.repository?.nameWithOwner || ""
+  };
+}
+
+function buildEpicsFromStories(stories) {
+  const epicsById = new Map();
+
+  stories.forEach((story) => {
+    if (!epicsById.has(story.epicId)) {
+      const title = story.epicId.replace(/^epic-/, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" ");
+      epicsById.set(story.epicId, {
+        id: story.epicId,
+        title,
+        description: `Stories grouped from the GitHub Project Epic field for ${title}.`,
+        startDate: new Date().toISOString().split("T")[0],
+        endDate: "",
+        owner: "GitHub Project"
+      });
+    }
+  });
+
+  return [...epicsById.values()];
+}
+
+async function resolveProjectId() {
+  const config = getGitHubProjectConfig();
+
+  if (!config) {
+    const error = new Error("GitHub project integration is not configured");
+    error.status = 503;
+    throw error;
+  }
+
+  if (config.projectId) {
+    return config.projectId;
+  }
+
+  const data = await fetchGitHubGraphQL(
+    `query($owner: String!, $number: Int!) {
+      organization(login: $owner) { projectV2(number: $number) { id title } }
+      user(login: $owner) { projectV2(number: $number) { id title } }
+    }`,
+    { owner: config.owner, number: config.projectNumber }
+  );
+  const project = data.organization?.projectV2 || data.user?.projectV2;
+
+  if (!project?.id) {
+    const error = new Error("GitHub Project was not found for the configured owner and number");
+    error.status = 404;
+    throw error;
+  }
+
+  return project.id;
+}
+
+async function getProjectMetadata(projectId) {
+  const data = await fetchGitHubGraphQL(
+    `query($projectId: ID!) {
+      node(id: $projectId) {
+        ... on ProjectV2 {
+          id
+          title
+          fields(first: 50) {
+            nodes {
+              ... on ProjectV2Field { id name }
+              ... on ProjectV2SingleSelectField { id name options { id name } }
+              ... on ProjectV2FieldCommon { id name }
+            }
+          }
+        }
+      }
+    }`,
+    { projectId }
+  );
+
+  const project = data.node;
+  if (!project) {
+    const error = new Error("GitHub Project metadata was not found");
+    error.status = 404;
+    throw error;
+  }
+
+  return project;
+}
+
+async function listProjectStories() {
+  const projectId = await resolveProjectId();
+  const students = (await readStudents()).map(normalizeStudent);
+  const items = [];
+  let cursor = null;
+
+  do {
+    const data = await fetchGitHubGraphQL(
+      `query($projectId: ID!, $cursor: String) {
+        node(id: $projectId) {
+          ... on ProjectV2 {
+            id
+            title
+            items(first: 50, after: $cursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                id
+                updatedAt
+                fieldValues(first: 30) {
+                  nodes {
+                    ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
+                    ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
+                    ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2FieldCommon { name } } }
+                    ... on ProjectV2ItemFieldUserValue { users(first: 10) { nodes { login } } field { ... on ProjectV2FieldCommon { name } } }
+                  }
+                }
+                content {
+                  __typename
+                  ... on DraftIssue { id title body }
+                  ... on Issue {
+                    id
+                    number
+                    title
+                    body
+                    state
+                    updatedAt
+                    url
+                    repository { nameWithOwner }
+                    assignees(first: 10) { nodes { login } }
+                  }
+                  ... on PullRequest {
+                    id
+                    number
+                    title
+                    body
+                    state
+                    updatedAt
+                    url
+                    repository { nameWithOwner }
+                    assignees(first: 10) { nodes { login } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }`,
+      { projectId, cursor }
+    );
+
+    const page = data.node?.items;
+    items.push(...(page?.nodes || []));
+    cursor = page?.pageInfo?.hasNextPage ? page.pageInfo.endCursor : null;
+  } while (cursor);
+
+  const stories = items
+    .filter((item) => item.content?.title)
+    .map((item) => normalizeProjectItemToStory(item, students));
+
+  return {
+    projectId,
+    epics: buildEpicsFromStories(stories),
+    stories
+  };
+}
+
+function findProjectField(project, fieldName) {
+  return project.fields?.nodes?.find((field) => field?.name === fieldName);
+}
+
+async function updateProjectSingleSelect(projectId, itemId, fieldName, optionName) {
+  const project = await getProjectMetadata(projectId);
+  const field = findProjectField(project, fieldName);
+  const option = field?.options?.find((item) => item.name === optionName);
+
+  if (!field?.id || !option?.id) {
+    const error = new Error(`GitHub Project field "${fieldName}" does not have option "${optionName}"`);
+    error.status = 400;
+    throw error;
+  }
+
+  await fetchGitHubGraphQL(
+    `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+      updateProjectV2ItemFieldValue(input: {
+        projectId: $projectId
+        itemId: $itemId
+        fieldId: $fieldId
+        value: { singleSelectOptionId: $optionId }
+      }) {
+        projectV2Item { id }
+      }
+    }`,
+    { projectId, itemId, fieldId: field.id, optionId: option.id }
+  );
+}
+
+async function updateProjectTextField(projectId, itemId, fieldName, text) {
+  if (!text) {
+    return;
+  }
+
+  const project = await getProjectMetadata(projectId);
+  const field = findProjectField(project, fieldName);
+
+  if (!field?.id) {
+    return;
+  }
+
+  await fetchGitHubGraphQL(
+    `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $text: String!) {
+      updateProjectV2ItemFieldValue(input: {
+        projectId: $projectId
+        itemId: $itemId
+        fieldId: $fieldId
+        value: { text: $text }
+      }) {
+        projectV2Item { id }
+      }
+    }`,
+    { projectId, itemId, fieldId: field.id, text }
+  );
+}
+
+function buildStoryIssueBody(form) {
+  const criteria = String(form.acceptanceCriteria || "")
+    .split("\n")
+    .map((item) => item.replace(/^[-*]\s*/, "").trim())
+    .filter(Boolean)
+    .map((item) => `- [ ] ${item}`)
+    .join("\n");
+
+  return [
+    "## OVERVIEW",
+    form.overview || "",
+    "",
+    `**Why are we doing this?** ${form.why || ""}`,
+    `**What problem does it solve?** ${form.problem || ""}`,
+    `**Who asked for it?** ${form.requestedBy || ""}`,
+    "",
+    "## REQUIREMENTS",
+    criteria || "- [ ] Add acceptance criteria",
+    "",
+    `**Constraints:** ${form.constraints || "None listed"}`,
+    `**Dependencies:** ${form.dependencies || "None listed"}`,
+    "",
+    "## OUTCOMES",
+    `**Artifact:** ${form.artifact || "PR"}`,
+    `**Verification:** ${form.verification || ""}`,
+    `**Artifact link:** ${form.artifactLink || ""}`,
+    `**Follow-up:** ${form.followUp || "None listed"}`
+  ].join("\n");
+}
+
+async function createProjectStory(form) {
+  const config = getGitHubConfig();
+  const projectId = await resolveProjectId();
+  const issue = await mutateGitHub(`/repos/${config.owner}/${config.repo}/issues`, {
+    method: "POST",
+    body: {
+      title: form.title,
+      body: buildStoryIssueBody(form),
+      labels: [form.storyType === "Spike" ? "spike" : "story"]
+    }
+  });
+
+  const added = await fetchGitHubGraphQL(
+    `mutation($projectId: ID!, $contentId: ID!) {
+      addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+        item { id }
+      }
+    }`,
+    { projectId, contentId: issue.node_id }
+  );
+
+  const itemId = added.addProjectV2ItemById.item.id;
+  await updateProjectTextField(projectId, itemId, "Epic", form.epicTitle || form.epicId || "Unassigned Epic");
+  await updateProjectSingleSelect(projectId, itemId, "Artifact", form.storyType === "Spike" ? "Doc" : form.artifact);
+  await updateProjectSingleSelect(projectId, itemId, "Story Type", form.storyType || "Story");
+  await updateProjectSingleSelect(projectId, itemId, "Kanban Status", "Backlog");
+
+  return listProjectStories();
 }
 
 const defaultTaskBlueprints = [
@@ -934,6 +1415,38 @@ app.get("/api/github/progress", async (_req, res, next) => {
       issues: issues.filter((issue) => !issue.pull_request).map(normalizeGitHubIssue),
       pullRequests: pullRequests.map(normalizeGitHubPullRequest)
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/github/project", async (_req, res, next) => {
+  try {
+    res.json(await listProjectStories());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/api/github/project/items/:itemId/status", async (req, res, next) => {
+  try {
+    const projectId = await resolveProjectId();
+    const statusName = statusToProjectName[req.body.status] || req.body.status;
+
+    if (!statusName) {
+      return res.status(400).json({ message: "Status is required" });
+    }
+
+    await updateProjectSingleSelect(projectId, req.params.itemId, "Kanban Status", statusName);
+    res.json({ itemId: req.params.itemId, status: req.body.status });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/github/project/issues", async (req, res, next) => {
+  try {
+    res.status(201).json(await createProjectStory(req.body));
   } catch (error) {
     next(error);
   }

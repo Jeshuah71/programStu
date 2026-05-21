@@ -69,30 +69,49 @@ Default ports:
 
 ## Test With Real GitHub Data
 
-The GitHub progress radar can read issues and pull requests from one real GitHub repository. For local testing, create a fine-grained personal access token in GitHub with read-only access to the repo.
+The GitHub progress radar can read issues and pull requests from one real GitHub repository. The Kanban board can also read and update a real GitHub Projects v2 board through the GraphQL API.
+
+Create `backend/.env` from the example file:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Fill in:
+
+```bash
+GITHUB_TOKEN=your_token_here
+GITHUB_OWNER=your-github-username-or-org
+GITHUB_REPO=your-repo-name
+GITHUB_PROJECT_OWNER=your-github-username-or-org
+GITHUB_PROJECT_NUMBER=8
+ANTHROPIC_API_KEY=your_anthropic_key_optional
+```
+
+`GITHUB_PROJECT_ID` is optional if `GITHUB_PROJECT_OWNER` and `GITHUB_PROJECT_NUMBER` are set. If you already know the ProjectV2 node ID, set `GITHUB_PROJECT_ID` instead.
 
 Required token permissions:
 
 - Metadata: read
-- Issues: read
+- Issues: read/write
 - Pull requests: read
+- Projects: read/write
 
-Start the backend with your GitHub settings:
+Your GitHub Project should have these custom fields:
+
+- `Epic` as a text field
+- `Artifact` as a single-select field with `PR`, `Doc`, `Query`, `Config`, `Runbook`, `Dashboard`
+- `Story Type` as a single-select field with `Story`, `Spike`
+- `Kanban Status` as a single-select field with `Backlog`, `Refined / Ready`, `Blocked`, `In Progress`, `In Review`, `Done`
+- Optional text fields: `Blocker`, `Dependencies`, `Verification`, `Requested By`
+
+Start the app:
 
 ```bash
-GITHUB_TOKEN=your_token_here \
-GITHUB_OWNER=your-github-username-or-org \
-GITHUB_REPO=your-repo-name \
-npm run dev --prefix backend
+npm run dev
 ```
 
-Then start the frontend:
-
-```bash
-npm run dev --prefix frontend
-```
-
-The frontend calls `/api/github/progress` through the backend. If the GitHub token, owner, repo, or backend is unavailable, the app falls back to the polished mock GitHub data so the demo still works.
+The frontend calls `/api/github/progress` and `/api/github/project` through the backend. If the GitHub token, repo, project, or backend is unavailable, the app falls back to polished mock data.
 
 Direct backend checks:
 
@@ -100,6 +119,7 @@ Direct backend checks:
 curl http://localhost:5000/api/github/issues
 curl http://localhost:5000/api/github/pulls
 curl http://localhost:5000/api/github/progress
+curl http://localhost:5000/api/github/project
 ```
 
 Never put `GITHUB_TOKEN` in frontend code or commit it to Git.
@@ -160,6 +180,10 @@ VITE_API_BASE_URL=http://localhost:5050/api npm run dev --prefix frontend
 - `PATCH /api/students/:id`
 - `PATCH /api/students/:id/tasks/:taskId`
 - `DELETE /api/students/:id`
+- `GET /api/github/progress`
+- `GET /api/github/project`
+- `PATCH /api/github/project/items/:itemId/status`
+- `POST /api/github/project/issues`
 - `POST /api/ai/blocker-help`
 - `POST /api/ai/manager-summary`
 
