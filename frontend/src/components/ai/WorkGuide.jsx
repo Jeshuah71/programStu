@@ -41,7 +41,7 @@ function WorkGuide({ student, stories, epics, blockers, prs, demoMode }) {
     <section className="glass-panel p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="section-kicker">Claude Work Guide</p>
+          <p className="section-kicker">AI Work Guide</p>
           <h2 className="mt-2 text-2xl font-semibold text-suu-black">What should I work on?</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-suu-darkGray">
             Uses your Kanban state, onboarding phase, blockers, and recent PRs to recommend one next story.
@@ -49,7 +49,7 @@ function WorkGuide({ student, stories, epics, blockers, prs, demoMode }) {
         </div>
         <button type="button" className="btn-primary" onClick={handleAsk} disabled={loading}>
           <Sparkles size={16} />
-          {loading ? "Asking Claude..." : "What should I work on?"}
+          {loading ? "Asking AI..." : "What should I work on?"}
         </button>
       </div>
 
@@ -70,4 +70,3 @@ function WorkGuide({ student, stories, epics, blockers, prs, demoMode }) {
 }
 
 export default WorkGuide;
-

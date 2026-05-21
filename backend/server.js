@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const dataFile = path.join(__dirname, "data", "students.json");
 const githubApiBaseUrl = "https://api.github.com";
-const anthropicApiBaseUrl = "https://api.anthropic.com/v1/messages";
+const openAiApiBaseUrl = "https://api.openai.com/v1/responses";
 
 app.use(cors());
 app.use(express.json());
@@ -133,38 +133,46 @@ async function fetchGitHubGraphQL(query, variables = {}) {
   return payload.data;
 }
 
-async function askClaude(prompt) {
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
+async function askOpenAI(prompt) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_MODEL || "gpt-5.2";
 
   if (!apiKey) {
-    const error = new Error("Anthropic integration is not configured");
+    const error = new Error("OpenAI integration is not configured");
     error.status = 503;
     throw error;
   }
 
-  const response = await fetch(anthropicApiBaseUrl, {
+  const response = await fetch(openAiApiBaseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01"
+      Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: "claude-3-5-sonnet-latest",
-      max_tokens: 700,
-      messages: [{ role: "user", content: prompt }]
+      model,
+      input: prompt,
+      max_output_tokens: 700
     })
   });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    const error = new Error(payload.error?.message || "Anthropic request failed");
+    const error = new Error(payload.error?.message || "OpenAI request failed");
     error.status = response.status;
     throw error;
   }
 
   const payload = await response.json();
-  return payload.content?.map((item) => item.text).join("\n").trim() || "";
+  return (
+    payload.output_text ||
+    payload.output
+      ?.flatMap((item) => item.content || [])
+      .map((item) => item.text || "")
+      .join("\n")
+      .trim() ||
+    ""
+  );
 }
 
 function normalizeGitHubIssue(issue) {
@@ -1471,7 +1479,7 @@ Respond with a short, direct answer (3-5 sentences max) covering:
 3. Any blocker they need to escalate today
 Speak directly to the student. Be specific, not generic.`;
 
-    const message = await askClaude(prompt);
+    const message = await askOpenAI(prompt);
     res.json({ message });
   } catch (error) {
     next(error);
@@ -1486,7 +1494,7 @@ app.post("/api/ai/manager-summary", async (req, res, next) => {
   }
 
   try {
-    const prompt = `You are Claude, preparing a manager weekly report for the SUU IT student programmer team.
+    const prompt = `You are an AI work-management assistant preparing a manager weekly report for the SUU IT student programmer team.
 Use all students' Kanban board states, epics on track versus at risk, stories stuck in Blocked or In Review for 3+ days, students with no activity this week, and recommended manager actions.
 
 Students: ${JSON.stringify(students)}
@@ -1501,9 +1509,9 @@ Output exactly this format:
 **Blockers to Resolve:** [specific blockers with student names]
 **Recommended Actions:** [3 concrete things the manager should do Monday morning]`;
 
-    const message = await askClaude(prompt);
+    const message = await askOpenAI(prompt);
     res.json({
-      weekRange: "Claude Generated",
+      weekRange: "AI Generated",
       teamSnapshot: message,
       winsThisWeek: [message],
       atRisk: [],

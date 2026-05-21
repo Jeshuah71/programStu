@@ -85,7 +85,8 @@ GITHUB_OWNER=your-github-username-or-org
 GITHUB_REPO=your-repo-name
 GITHUB_PROJECT_OWNER=your-github-username-or-org
 GITHUB_PROJECT_NUMBER=8
-ANTHROPIC_API_KEY=your_anthropic_key_optional
+OPENAI_API_KEY=your_openai_key_optional
+OPENAI_MODEL=gpt-5.2
 ```
 
 `GITHUB_PROJECT_ID` is optional if `GITHUB_PROJECT_OWNER` and `GITHUB_PROJECT_NUMBER` are set. If you already know the ProjectV2 node ID, set `GITHUB_PROJECT_ID` instead.
