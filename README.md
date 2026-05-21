@@ -64,7 +64,7 @@ npm run dev
 
 Default ports:
 
-- Backend: `http://localhost:5000`
+- Backend: `http://localhost:5050`
 - Frontend: `http://localhost:5173`
 
 ## Test With Real GitHub Data
@@ -117,10 +117,10 @@ The frontend calls `/api/github/progress` and `/api/github/project` through the 
 Direct backend checks:
 
 ```bash
-curl http://localhost:5000/api/github/issues
-curl http://localhost:5000/api/github/pulls
-curl http://localhost:5000/api/github/progress
-curl http://localhost:5000/api/github/project
+curl http://localhost:5050/api/github/issues
+curl http://localhost:5050/api/github/pulls
+curl http://localhost:5050/api/github/progress
+curl http://localhost:5050/api/github/project
 ```
 
 Never put `GITHUB_TOKEN` in frontend code or commit it to Git.
@@ -156,20 +156,20 @@ npm run dev --prefix frontend
 
 This app now handles the original fetch issue in two ways:
 
-1. The frontend uses `/api` by default in development, and Vite proxies requests to `http://localhost:5000`.
+1. The frontend uses `/api` by default in development, and Vite proxies requests to `http://localhost:5050`.
 2. If `GET /api/students` fails, the frontend automatically switches to demo mode and loads sample student onboarding data.
 
 If you still want the live backend:
 
-- Confirm the backend is running on `http://localhost:5000`
+- Confirm the backend is running on `http://localhost:5050`
 - Confirm `backend/data/students.json` exists and is valid JSON
 - Confirm no other process is blocking the backend port
 
-If port `5000` is already in use:
+If port `5050` is already in use:
 
 ```bash
-PORT=5050 npm run dev --prefix backend
-VITE_API_BASE_URL=http://localhost:5050/api npm run dev --prefix frontend
+PORT=5051 npm run dev --prefix backend
+VITE_API_BASE_URL=http://localhost:5051/api npm run dev --prefix frontend
 ```
 
 ## API Endpoints

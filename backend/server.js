@@ -6,7 +6,7 @@ const fs = require("fs/promises");
 const path = require("path");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 const dataFile = path.join(__dirname, "data", "students.json");
 const githubApiBaseUrl = "https://api.github.com";
 const openAiApiBaseUrl = "https://api.openai.com/v1/responses";
@@ -378,22 +378,51 @@ async function resolveProjectId() {
     return config.projectId;
   }
 
-  const data = await fetchGitHubGraphQL(
+  const projectAccessErrors = [];
+  const userProject = await fetchGitHubGraphQL(
     `query($owner: String!, $number: Int!) {
-      organization(login: $owner) { projectV2(number: $number) { id title } }
-      user(login: $owner) { projectV2(number: $number) { id title } }
+      user(login: $owner) {
+        projectV2(number: $number) { id title }
+      }
     }`,
     { owner: config.owner, number: config.projectNumber }
-  );
-  const project = data.organization?.projectV2 || data.user?.projectV2;
+  ).catch((error) => {
+    projectAccessErrors.push(error.message);
+    return null;
+  });
+  const project = userProject?.user?.projectV2;
 
-  if (!project?.id) {
-    const error = new Error("GitHub Project was not found for the configured owner and number");
+  if (project?.id) {
+    return project.id;
+  }
+
+  const orgProject = await fetchGitHubGraphQL(
+    `query($owner: String!, $number: Int!) {
+      organization(login: $owner) {
+        projectV2(number: $number) { id title }
+      }
+    }`,
+    { owner: config.owner, number: config.projectNumber }
+  ).catch((error) => {
+    projectAccessErrors.push(error.message);
+    return null;
+  });
+  const organizationProject = orgProject?.organization?.projectV2;
+
+  if (!organizationProject?.id) {
+    const accessDenied = projectAccessErrors.find((message) =>
+      message.toLowerCase().includes("not accessible") || message.toLowerCase().includes("forbidden")
+    );
+    const error = new Error(
+      accessDenied
+        ? `GitHub Project is not accessible with the current token: ${accessDenied}`
+        : "GitHub Project was not found for the configured owner and number"
+    );
     error.status = 404;
     throw error;
   }
 
-  return project.id;
+  return organizationProject.id;
 }
 
 async function getProjectMetadata(projectId) {
